@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "props"
+version = "1.0.0"
+description = "Props custom handlers, blueprints, and utilities"
+license = { text = "MIT" }
+authors = [
+    {name = "Renglo Team"}
+]
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.32.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[tool.setuptools]
+packages = ["props", "props.handlers"]
+
+[tool.setuptools.package-data]
+props = ["blueprints/*.json"]
