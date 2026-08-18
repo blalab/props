@@ -54,8 +54,11 @@ export default function PropsExtension({ portfolio, org, tool, section, tree, qu
             {section === 'orders' && (
                 <Orders />
             )}
+            {section === 'product-details' && (
+                <Marketplace portfolio={portfolio} org={org} tool={tool} detailId={query?.id} />
+            )}
             
-            {section !== 'dashboard' && section !== 'favorites' && section !== 'orders' && (
+            {section !== 'dashboard' && section !== 'favorites' && section !== 'orders' && section !== 'product-details' && (
                 <div className="p-6">
                     <h2 className="text-xl font-semibold">Under Construction</h2>
                     <p className="text-muted-foreground mt-2">The section '{section}' is not yet implemented.</p>
