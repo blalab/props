@@ -37,61 +37,76 @@ export default function Marketplace({ portfolio, org, tool, detailId, initialCat
   const [propsList, setPropsList] = useState<PropItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    const storedFavs = localStorage.getItem('props_favorites');
-    if (storedFavs) {
+  const getUserSub = () => {
+    const token = sessionStorage.accessToken;
+    if (token) {
       try {
-        setFavorites(JSON.parse(storedFavs));
-      } catch (e) {
-        console.error("Failed to parse favorites", e);
-      }
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.sub || payload.username || "anonymous";
+      } catch (e) {}
     }
-  }, []);
-
-  const toggleFavorite = (id: string) => {
-    setFavorites(prev => {
-      const isFav = prev.includes(id);
-      const newFavs = isFav ? prev.filter(f => f !== id) : [...prev, id];
-      localStorage.setItem('props_favorites', JSON.stringify(newFavs));
-      return newFavs;
-    });
+    return "anonymous";
   };
 
-  const seedProps = async () => {
+  const fetchFavorites = async () => {
     if (!portfolio || !org) return;
-    setIsLoading(true);
     try {
-      for (const prop of propsList) {
-        try {
-          const idToDelete = (prop as any)._id || prop.id;
-          await fetch(`${import.meta.env.VITE_API_URL}/_data/${portfolio}/${org}/props_items/${idToDelete}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${sessionStorage.accessToken}` }
-          });
-        } catch (e) {
-          console.error('Failed to delete item', e);
-        }
+      const userSub = getUserSub();
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/_data/${portfolio}/${org}/props_favorites?limit=500`, {
+        headers: { 'Authorization': `Bearer ${sessionStorage.accessToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : (data.items || []);
+        // Filter by userSub manually just in case
+        const userFavs = items.filter((f: any) => f.user_sub === userSub);
+        setFavorites(userFavs.map((f: any) => f.prop_id));
       }
+    } catch (e) {
+      console.error("Failed to fetch favorites", e);
+    }
+  };
 
-      for (const prop of MOCK_PROPS) {
-        const payload = { ...prop, _id: prop.id };
-        await fetch(`${import.meta.env.VITE_API_URL}/_data/${portfolio}/${org}/props_items`, {
+  useEffect(() => {
+    fetchFavorites();
+  }, [portfolio, org]);
+
+  const toggleFavorite = async (id: string) => {
+    const userSub = getUserSub();
+    const favId = `${userSub}_${id}`;
+    
+    setFavorites(prev => {
+      const isFav = prev.includes(id);
+      return isFav ? prev.filter(f => f !== id) : [...prev, id];
+    });
+
+    try {
+      if (favorites.includes(id)) {
+        // Remove
+        await fetch(`${import.meta.env.VITE_API_URL}/_data/${portfolio}/${org}/props_favorites/${favId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${sessionStorage.accessToken}` }
+        });
+      } else {
+        // Add
+        await fetch(`${import.meta.env.VITE_API_URL}/_data/${portfolio}/${org}/props_favorites`, {
           method: 'POST',
-          headers: {
+          headers: { 
             'Authorization': `Bearer ${sessionStorage.accessToken}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({
+            _id: favId,
+            id: favId,
+            prop_id: id,
+            user_sub: userSub
+          })
         });
       }
-      await fetchProps(); // Reload after seeding
     } catch (e) {
-      console.error('Error seeding props:', e);
-    } finally {
-      setIsLoading(false);
+      console.error("Failed to toggle favorite", e);
     }
   };
-
   // Fetch props from API
   const fetchProps = async () => {
     if (!portfolio || !org) return;
@@ -216,9 +231,6 @@ export default function Marketplace({ portfolio, org, tool, detailId, initialCat
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold tracking-tight">Acme Prop Rentals</h1>
-            <Button variant="outline" size="sm" onClick={seedProps} disabled={isLoading} className="h-7 text-[10px] uppercase tracking-wider hidden sm:flex">
-               {isLoading ? "Updating..." : "Force Cache Sync"}
-            </Button>
           </div>
           <p className="text-muted-foreground mt-1 text-sm">
             Browse and request items for your upcoming sets.
@@ -414,9 +426,6 @@ export default function Marketplace({ portfolio, org, tool, detailId, initialCat
                   <Search className="h-12 w-12 mb-4 opacity-20" />
                   <p className="text-lg font-medium">No props found.</p>
                   <p className="text-sm mb-6">Try adjusting your filters or search query.</p>
-                  <Button onClick={seedProps} disabled={isLoading} variant="secondary">
-                    {isLoading ? "Seeding..." : "Seed Demo Props"}
-                  </Button>
                 </div>
               )}
             </>

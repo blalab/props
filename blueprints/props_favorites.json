@@ -1,0 +1,69 @@
+{
+    "_id": "5e834ed5-props-favorites-000000001",
+    "added": "2026-08-18T10:00:00.000000",
+    "blueprint_origin": "",
+    "description": "User specific favorites for props",
+    "fields": [
+        {
+            "cardinality": "single",
+            "default": "",
+            "hint": "Unique identifier combining user and prop",
+            "label": "ID",
+            "layer": "0",
+            "multilingual": false,
+            "name": "id",
+            "order": "1",
+            "required": true,
+            "semantic": "hs:id",
+            "source": "",
+            "type": "string",
+            "widget": "text"
+        },
+        {
+            "cardinality": "single",
+            "default": "",
+            "hint": "Prop Item ID",
+            "label": "Prop ID",
+            "layer": "0",
+            "multilingual": false,
+            "name": "prop_id",
+            "order": "2",
+            "required": true,
+            "semantic": "hs:foreign_key",
+            "source": "",
+            "type": "string",
+            "widget": "text"
+        },
+        {
+            "cardinality": "single",
+            "default": "",
+            "hint": "User Subject Identifier",
+            "label": "User Sub",
+            "layer": "0",
+            "multilingual": false,
+            "name": "user_sub",
+            "order": "3",
+            "required": true,
+            "semantic": "hs:foreign_key",
+            "source": "",
+            "type": "string",
+            "widget": "text"
+        }
+    ],
+    "hint": "Props Favorites",
+    "icon": "star",
+    "is_abstract": false,
+    "label": "Props Favorites",
+    "layout": [],
+    "model_type": "standard",
+    "name": "props_favorites",
+    "order": "100",
+    "primary_field": "id",
+    "public": false,
+    "roles": [],
+    "searchable": [
+        "id",
+        "prop_id",
+        "user_sub"
+    ]
+}

@@ -6,28 +6,93 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-export default function Favorites() {
+export default function Favorites({ portfolio, org, tool }: { portfolio?: string; org?: string; tool?: string; }) {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [cart, setCart] = useState<(PropItem & { quantity: number })[]>([]);
+  const [propsList, setPropsList] = useState<PropItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const getUserSub = () => {
+    const token = sessionStorage.accessToken;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.sub || payload.username || "anonymous";
+      } catch (e) {}
+    }
+    return "anonymous";
+  };
+
+  const fetchData = async () => {
+    if (!portfolio || !org) return;
+    setIsLoading(true);
+    try {
+      // Fetch props
+      const resProps = await fetch(`${import.meta.env.VITE_API_URL}/_data/${portfolio}/${org}/props_items?limit=500`, {
+        headers: { 'Authorization': `Bearer ${sessionStorage.accessToken}` }
+      });
+      if (resProps.ok) {
+        const data = await resProps.json();
+        setPropsList(Array.isArray(data) ? data : (data.items || []));
+      }
+
+      // Fetch favorites
+      const userSub = getUserSub();
+      const resFavs = await fetch(`${import.meta.env.VITE_API_URL}/_data/${portfolio}/${org}/props_favorites?limit=500`, {
+        headers: { 'Authorization': `Bearer ${sessionStorage.accessToken}` }
+      });
+      if (resFavs.ok) {
+        const data = await resFavs.json();
+        const items = Array.isArray(data) ? data : (data.items || []);
+        const userFavs = items.filter((f: any) => f.user_sub === userSub);
+        setFavorites(userFavs.map((f: any) => f.prop_id));
+      }
+    } catch (e) {
+      console.error("Failed to fetch data", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const storedFavs = localStorage.getItem('props_favorites');
-    if (storedFavs) {
-      try {
-        setFavorites(JSON.parse(storedFavs));
-      } catch (e) {
-        console.error("Failed to parse favorites", e);
-      }
-    }
-  }, []);
+    fetchData();
+  }, [portfolio, org]);
 
-  const toggleFavorite = (id: string) => {
+  const toggleFavorite = async (id: string) => {
+    const userSub = getUserSub();
+    const favId = `${userSub}_${id}`;
+    
     setFavorites(prev => {
       const isFav = prev.includes(id);
-      const newFavs = isFav ? prev.filter(f => f !== id) : [...prev, id];
-      localStorage.setItem('props_favorites', JSON.stringify(newFavs));
-      return newFavs;
+      return isFav ? prev.filter(f => f !== id) : [...prev, id];
     });
+
+    try {
+      if (favorites.includes(id)) {
+        // Remove
+        await fetch(`${import.meta.env.VITE_API_URL}/_data/${portfolio}/${org}/props_favorites/${favId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${sessionStorage.accessToken}` }
+        });
+      } else {
+        // Add
+        await fetch(`${import.meta.env.VITE_API_URL}/_data/${portfolio}/${org}/props_favorites`, {
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${sessionStorage.accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            _id: favId,
+            id: favId,
+            prop_id: id,
+            user_sub: userSub
+          })
+        });
+      }
+    } catch (e) {
+      console.error("Failed to toggle favorite", e);
+    }
   };
 
   const addToCart = (prop: PropItem) => {
@@ -58,7 +123,7 @@ export default function Favorites() {
     );
   };
 
-  const favoriteProps = MOCK_PROPS.filter((prop) => favorites.includes(prop.id));
+  const favoriteProps = propsList.filter((prop) => favorites.includes(prop.id));
 
   return (
     <div className="flex flex-col min-h-screen w-full bg-background p-6">
@@ -111,7 +176,15 @@ export default function Favorites() {
               </button>
             </div>
             <CardContent className="p-0 flex-1">
-              <h3 className="font-semibold text-primary/90 text-sm mb-1 line-clamp-1">{prop.title}</h3>
+              <h3 
+                className="font-semibold text-primary/90 text-sm mb-1 line-clamp-1 cursor-pointer hover:underline"
+                onClick={() => {
+                  window.history.pushState({}, '', `/${portfolio}/${org}/${tool}/product-details?id=${prop.id}`);
+                  window.dispatchEvent(new Event('popstate'));
+                }}
+              >
+                {prop.title}
+              </h3>
               <div className="text-xs text-muted-foreground mb-2">
                 <span className="font-bold text-foreground">${prop.price}</span> — 1 for rent
               </div>
