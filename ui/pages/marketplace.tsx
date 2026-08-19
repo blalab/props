@@ -26,6 +26,15 @@ export default function Marketplace({ portfolio, org, tool, detailId, initialCat
     setSelectedDetailId(detailId || null);
   }, [detailId]);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setSelectedDetailId(params.get('id') || null);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const [activeCategory, setActiveCategory] = useState<string | null>(initialCategory || null);
   const [activeSubcategory, setActiveSubcategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");

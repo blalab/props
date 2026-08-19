@@ -18,6 +18,15 @@ export default function Favorites({ portfolio, org, tool, detailId }: { portfoli
     setSelectedDetailId(detailId || null);
   }, [detailId]);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setSelectedDetailId(params.get('id') || null);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const getUserSub = () => {
     const token = sessionStorage.accessToken;
     if (token) {
@@ -158,7 +167,14 @@ export default function Favorites({ portfolio, org, tool, detailId }: { portfoli
           <ProductDetails 
              propItem={propsList.find(p => p.id === selectedDetailId) || null} 
              isLoading={isLoading}
-             onBack={() => setSelectedDetailId(null)} 
+             onBack={() => {
+               if (window.history.state?.openedFromApp) {
+                 window.history.back();
+               } else {
+                 setSelectedDetailId(null);
+                 window.history.replaceState({}, '', `/${portfolio}/${org}/${tool}/favorites`);
+               }
+             }} 
              onAddToCart={addToCart} 
           />
         ) : (
@@ -170,6 +186,7 @@ export default function Favorites({ portfolio, org, tool, detailId }: { portfoli
                     className="relative aspect-[4/3] overflow-hidden bg-muted rounded-md mb-3 cursor-pointer"
                     onClick={() => {
                       setSelectedDetailId(prop.id);
+                      window.history.pushState({ openedFromApp: true }, '', `/${portfolio}/${org}/${tool}/favorites?id=${prop.id}`);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                   >
@@ -205,6 +222,7 @@ export default function Favorites({ portfolio, org, tool, detailId }: { portfoli
                       className="font-semibold text-primary/90 text-sm mb-1 line-clamp-1 cursor-pointer hover:underline"
                       onClick={() => {
                         setSelectedDetailId(prop.id);
+                        window.history.pushState({ openedFromApp: true }, '', `/${portfolio}/${org}/${tool}/favorites?id=${prop.id}`);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
                     >
