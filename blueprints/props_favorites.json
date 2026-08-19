@@ -50,20 +50,27 @@
             "widget": "text"
         }
     ],
+    "handle": "irma",
     "hint": "Props Favorites",
     "icon": "star",
+    "irn": "irn:blueprint:irma:props_favorites",
     "is_abstract": false,
     "label": "Props Favorites",
     "layout": [],
+    "license": "CC BY",
     "model_type": "standard",
     "name": "props_favorites",
     "order": "100",
     "primary_field": "id",
-    "public": false,
+    "public": true,
     "roles": [],
     "searchable": [
         "id",
         "prop_id",
         "user_sub"
-    ]
+    ],
+    "singleton": false,
+    "status": "final",
+    "uri": "https://helloirma.com/_blueprint/irma/props_favorites/1.0.0",
+    "version": "1.0.0"
 }

@@ -321,8 +321,12 @@ export default function Marketplace({ portfolio, org, tool, detailId, initialCat
                propItem={propsList.find(p => p.id === selectedDetailId) || null} 
                isLoading={isLoading}
                onBack={() => {
-                 setSelectedDetailId(null);
-                 window.history.pushState({}, '', `/${portfolio}/${org}/${tool}/dashboard`);
+                 if (window.history.state?.openedFromApp) {
+                   window.history.back();
+                 } else {
+                   setSelectedDetailId(null);
+                   window.history.replaceState({}, '', `/${portfolio}/${org}/${tool}/dashboard`);
+                 }
                }} 
                onAddToCart={addToCart} 
             />
@@ -358,7 +362,7 @@ export default function Marketplace({ portfolio, org, tool, detailId, initialCat
                       className="relative aspect-[4/3] overflow-hidden bg-muted rounded-md mb-3 cursor-pointer"
                       onClick={() => {
                         setSelectedDetailId(prop.id);
-                        window.history.pushState({}, '', `/${portfolio}/${org}/${tool}/product-details?id=${prop.id}`);
+                        window.history.pushState({ openedFromApp: true }, '', `/${portfolio}/${org}/${tool}/product-details?id=${prop.id}`);
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
                     >
@@ -391,7 +395,7 @@ export default function Marketplace({ portfolio, org, tool, detailId, initialCat
                         className="font-semibold text-primary/90 text-sm mb-1 line-clamp-1 cursor-pointer hover:underline"
                         onClick={() => {
                           setSelectedDetailId(prop.id);
-                          window.history.pushState({}, '', `/${portfolio}/${org}/${tool}/product-details?id=${prop.id}`);
+                          window.history.pushState({ openedFromApp: true }, '', `/${portfolio}/${org}/${tool}/product-details?id=${prop.id}`);
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                       >

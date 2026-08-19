@@ -37,7 +37,7 @@ export default function PropsExtension({ portfolio, org, tool, section, tree, qu
 
     const currentSection = (!section || EMPTY_SECTIONS.includes(section)) ? 'dashboard' : section;
     const isMarketplace = MARKETPLACE_SECTIONS.includes(currentSection);
-    const detailId = currentSection === 'product-details' ? query?.id : undefined;
+    const detailId = (currentSection === 'product-details' || currentSection === 'favorites') ? query?.id : undefined;
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-muted/40">
@@ -45,7 +45,7 @@ export default function PropsExtension({ portfolio, org, tool, section, tree, qu
                 <Marketplace portfolio={portfolio} org={org} tool={tool} detailId={detailId} />
             )}
             {currentSection === 'favorites' && (
-                <Favorites portfolio={portfolio} org={org} tool={tool} />
+                <Favorites portfolio={portfolio} org={org} tool={tool} detailId={detailId} />
             )}
             {currentSection === 'orders' && (
                 <Orders />
