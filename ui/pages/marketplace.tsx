@@ -35,6 +35,7 @@ export default function Marketplace({ portfolio, org, tool, detailId, initialCat
   const [cart, setCart] = useState<(PropItem & { quantity: number })[]>([]);
   
   const [propsList, setPropsList] = useState<PropItem[]>([]);
+  const [searchResultIds, setSearchResultIds] = useState<string[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const getUserSub = () => {
@@ -70,6 +71,54 @@ export default function Marketplace({ portfolio, org, tool, detailId, initialCat
   useEffect(() => {
     fetchFavorites();
   }, [portfolio, org]);
+
+  const fetchSearch = async (query: string) => {
+    if (!portfolio || !org) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/_search/${portfolio}/${org}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query: query,
+          filters: {
+            rings: ["props_items"],
+            resolve: false // Bypasses BatchGetItem IAM restriction
+          },
+          limit: 100
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const items = data.items || [];
+        // Extract doc_id (_id) from the raw index hits
+        const matchedIds = items.map((hit: any) => hit.doc_id).filter(Boolean);
+        setSearchResultIds(matchedIds);
+      } else {
+        console.error('Failed to search props');
+        setSearchResultIds([]);
+      }
+    } catch (e) {
+      console.error('Error searching props:', e);
+      setSearchResultIds([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery.trim() === "") {
+        setSearchResultIds(null);
+      } else {
+        fetchSearch(searchQuery);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [portfolio, org, searchQuery]);
 
   const toggleFavorite = async (id: string) => {
     const userSub = getUserSub();
@@ -133,23 +182,19 @@ export default function Marketplace({ portfolio, org, tool, detailId, initialCat
     }
   };
 
-
   useEffect(() => {
     fetchProps();
   }, [portfolio, org]);
-
-
 
   // Derived state for filtering
   const filteredProps = useMemo(() => {
     return propsList.filter((prop) => {
       const matchesCategory = activeCategory ? prop.category === activeCategory : true;
       const matchesSubcategory = activeSubcategory ? prop.subcategory === activeSubcategory : true;
-      const matchesSearch = prop.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            (prop.tags && prop.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())));
+      const matchesSearch = searchResultIds === null ? true : searchResultIds.includes(prop._id || prop.id);
       return matchesCategory && matchesSubcategory && matchesSearch;
     });
-  }, [activeCategory, activeSubcategory, searchQuery, propsList]);
+  }, [activeCategory, activeSubcategory, searchResultIds, propsList]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredProps.length / ITEMS_PER_PAGE);
