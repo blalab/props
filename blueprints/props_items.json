@@ -8,7 +8,7 @@
             "cardinality": "single",
             "default": "",
             "hint": "Unique identifier (SKU)",
-            "label": "ID",
+            "label": "SKU",
             "layer": "0",
             "multilingual": false,
             "name": "id",
@@ -218,6 +218,22 @@
             "source": "",
             "type": "string",
             "widget": "tags"
+        },
+        {
+            "cardinality": "single",
+            "default": "",
+            "hint": "The owner of the prop",
+            "label": "Owner",
+            "layer": "0",
+            "multilingual": false,
+            "name": "owner",
+            "order": "15",
+            "required": false,
+            "search": 3,
+            "semantic": "hs:owner",
+            "source": "",
+            "type": "string",
+            "widget": "text"
         }
     ],
     "handle": "irma",
