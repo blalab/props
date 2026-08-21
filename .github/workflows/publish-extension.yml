@@ -1,0 +1,116 @@
+name: Publish extension (Python + npm)
+
+# For Renglo-style extension repos with both package/ and ui/ on the same git tag.
+# Canonical copy: ops/publisher/workflows/publish-extension.yml
+#
+# Repository variables (same three for every publish workflow in this repo):
+#   AWS_PUBLISH_ROLE_ARN
+#   PUBLISHER_CONFIG_PARAM
+#   AWS_REGION
+#
+# Optional: PUBLISH_PUBLIC=true plus PYPI_API_TOKEN and NPM_TOKEN secrets
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      publish_public:
+        description: Also publish to public PyPI and npmjs
+        type: boolean
+        default: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PUBLISH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Publish Python to CodeArtifact
+        env:
+          PUBLISHER_CONFIG_PARAM: ${{ vars.PUBLISHER_CONFIG_PARAM }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PUBLISHER_CONFIG_PARAM:-}" ]; then
+            echo "Set repository variable PUBLISHER_CONFIG_PARAM" >&2
+            exit 1
+          fi
+          CONFIG=$(aws ssm get-parameter --name "$PUBLISHER_CONFIG_PARAM" --query Parameter.Value --output text)
+          DOMAIN=$(printf '%s' "$CONFIG" | python3 -c 'import json,sys; print(json.load(sys.stdin)["domain"])')
+          REPO=$(printf '%s' "$CONFIG" | python3 -c 'import json,sys; print(json.load(sys.stdin)["python_repository"])')
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          python -m pip install --upgrade pip build twine
+          aws codeartifact login --tool twine \
+            --domain "$DOMAIN" \
+            --domain-owner "$ACCOUNT" \
+            --repository "$REPO"
+          python -m build package
+          twine upload --repository codeartifact dist/*
+
+      - name: Publish to public PyPI
+        if: ${{ vars.PUBLISH_PUBLIC == 'true' || github.event.inputs.publish_public == 'true' }}
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade twine
+          twine upload dist/*
+
+  publish-npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PUBLISH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Publish npm to CodeArtifact
+        env:
+          PUBLISHER_CONFIG_PARAM: ${{ vars.PUBLISHER_CONFIG_PARAM }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PUBLISHER_CONFIG_PARAM:-}" ]; then
+            echo "Set repository variable PUBLISHER_CONFIG_PARAM" >&2
+            exit 1
+          fi
+          CONFIG=$(aws ssm get-parameter --name "$PUBLISHER_CONFIG_PARAM" --query Parameter.Value --output text)
+          DOMAIN=$(printf '%s' "$CONFIG" | python3 -c 'import json,sys; print(json.load(sys.stdin)["domain"])')
+          REPO=$(printf '%s' "$CONFIG" | python3 -c 'import json,sys; print(json.load(sys.stdin)["npm_repository"])')
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          aws codeartifact login --tool npm \
+            --domain "$DOMAIN" \
+            --domain-owner "$ACCOUNT" \
+            --repository "$REPO"
+          cd ui
+          npm publish --access restricted
+
+      - name: Publish to public npmjs
+        if: ${{ vars.PUBLISH_PUBLIC == 'true' || github.event.inputs.publish_public == 'true' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd ui
+          npm config set registry https://registry.npmjs.org/
+          npm publish --access public
