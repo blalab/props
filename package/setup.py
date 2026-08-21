@@ -6,7 +6,7 @@ Custom handlers, blueprints, and utilities for the Props extension
 from setuptools import setup, find_packages
 
 setup(
-    name="props",
+    name="renglo-props",
     version="1.0.0",
     description="Props custom handlers, blueprints, and utilities",
     author="Renglo Team",
