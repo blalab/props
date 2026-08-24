@@ -5,7 +5,7 @@ name: Publish extension (Python + npm)
 #
 # Repository variables (same three for every publish workflow in this repo):
 #   AWS_PUBLISH_ROLE_ARN
-#   PUBLISHER_CONFIG_PARAM
+#   PUBLISHER_NAME            e.g. renglo  →  SSM /publisher/renglo/config
 #   AWS_REGION
 #
 # Optional: PUBLISH_PUBLIC=true plus PYPI_API_TOKEN and NPM_TOKEN secrets
@@ -42,14 +42,16 @@ jobs:
 
       - name: Publish Python to CodeArtifact
         env:
-          PUBLISHER_CONFIG_PARAM: ${{ vars.PUBLISHER_CONFIG_PARAM }}
+          PUBLISHER_NAME: ${{ vars.PUBLISHER_NAME }}
         run: |
           set -euo pipefail
-          if [ -z "${PUBLISHER_CONFIG_PARAM:-}" ]; then
-            echo "Set repository variable PUBLISHER_CONFIG_PARAM" >&2
+          if [ -z "${PUBLISHER_NAME:-}" ]; then
+            echo "Set repository variable PUBLISHER_NAME (e.g. renglo)" >&2
             exit 1
           fi
-          CONFIG=$(aws ssm get-parameter --name "$PUBLISHER_CONFIG_PARAM" --query Parameter.Value --output text)
+          slug=$(printf '%s' "$PUBLISHER_NAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+          CONFIG_PARAM="/publisher/${slug}/config"
+          CONFIG=$(aws ssm get-parameter --name "$CONFIG_PARAM" --query Parameter.Value --output text)
           DOMAIN=$(printf '%s' "$CONFIG" | python3 -c 'import json,sys; print(json.load(sys.stdin)["domain"])')
           REPO=$(printf '%s' "$CONFIG" | python3 -c 'import json,sys; print(json.load(sys.stdin)["python_repository"])')
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
@@ -58,8 +60,32 @@ jobs:
             --domain "$DOMAIN" \
             --domain-owner "$ACCOUNT" \
             --repository "$REPO"
+          # Copy repo-root blueprints/ into package/<import>/blueprints/ (git layout unchanged).
+          python3 <<'PY'
+          from pathlib import Path
+          import shutil
+          root = Path(".")
+          src = root / "blueprints"
+          files = sorted(src.glob("*.json")) if src.is_dir() else []
+          if not files:
+              print("No repo-root blueprints/*.json; skipping stage")
+              raise SystemExit(0)
+          skip = {"tests", "test", "docs", "build", "dist"}
+          dest_pkg = None
+          for child in sorted((root / "package").iterdir()):
+              if child.is_dir() and (child / "__init__.py").is_file() and child.name not in skip and not child.name.endswith(".egg-info"):
+                  dest_pkg = child
+                  break
+          if dest_pkg is None:
+              raise SystemExit("Could not find import package under package/")
+          dest = dest_pkg / "blueprints"
+          dest.mkdir(parents=True, exist_ok=True)
+          for path in files:
+              shutil.copy2(path, dest / path.name)
+          print(f"Staged {len(files)} blueprint(s) into {dest}")
+          PY
           python -m build package
-          twine upload --repository codeartifact dist/*
+          twine upload --repository codeartifact package/dist/*
 
       - name: Publish to public PyPI
         if: ${{ vars.PUBLISH_PUBLIC == 'true' || github.event.inputs.publish_public == 'true' }}
@@ -69,7 +95,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade twine
-          twine upload dist/*
+          twine upload package/dist/*
 
   publish-npm:
     runs-on: ubuntu-latest
@@ -87,14 +113,16 @@ jobs:
 
       - name: Publish npm to CodeArtifact
         env:
-          PUBLISHER_CONFIG_PARAM: ${{ vars.PUBLISHER_CONFIG_PARAM }}
+          PUBLISHER_NAME: ${{ vars.PUBLISHER_NAME }}
         run: |
           set -euo pipefail
-          if [ -z "${PUBLISHER_CONFIG_PARAM:-}" ]; then
-            echo "Set repository variable PUBLISHER_CONFIG_PARAM" >&2
+          if [ -z "${PUBLISHER_NAME:-}" ]; then
+            echo "Set repository variable PUBLISHER_NAME (e.g. renglo)" >&2
             exit 1
           fi
-          CONFIG=$(aws ssm get-parameter --name "$PUBLISHER_CONFIG_PARAM" --query Parameter.Value --output text)
+          slug=$(printf '%s' "$PUBLISHER_NAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+          CONFIG_PARAM="/publisher/${slug}/config"
+          CONFIG=$(aws ssm get-parameter --name "$CONFIG_PARAM" --query Parameter.Value --output text)
           DOMAIN=$(printf '%s' "$CONFIG" | python3 -c 'import json,sys; print(json.load(sys.stdin)["domain"])')
           REPO=$(printf '%s' "$CONFIG" | python3 -c 'import json,sys; print(json.load(sys.stdin)["npm_repository"])')
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
@@ -103,6 +131,7 @@ jobs:
             --domain-owner "$ACCOUNT" \
             --repository "$REPO"
           cd ui
+          npm pkg delete private || true
           npm publish --access restricted
 
       - name: Publish to public npmjs
@@ -112,5 +141,6 @@ jobs:
         run: |
           set -euo pipefail
           cd ui
+          npm pkg delete private || true
           npm config set registry https://registry.npmjs.org/
           npm publish --access public
