@@ -1,7 +1,9 @@
 name: Publish extension (Python + npm)
 
-# For Renglo-style extension repos with both package/ and ui/ on the same git tag.
-# Canonical copy: ops/publisher/workflows/publish-extension.yml
+# For Renglo-style extension repos. One tag publishes whichever trees exist:
+#   package/pyproject.toml  →  Python wheel
+#   ui/package.json         →  npm package
+# Missing trees skip that job. Canonical copy: ops/publisher/workflows/publish-extension.yml
 #
 # Repository variables (same three for every publish workflow in this repo):
 #   AWS_PUBLISH_ROLE_ARN
@@ -26,7 +28,36 @@ permissions:
   contents: read
 
 jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.layout.outputs.python }}
+      npm: ${{ steps.layout.outputs.npm }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: layout
+        run: |
+          set -euo pipefail
+          python=false
+          npm=false
+          if [ -f package/pyproject.toml ]; then
+            python=true
+          fi
+          if [ -f ui/package.json ]; then
+            npm=true
+          fi
+          echo "python=${python}" >> "$GITHUB_OUTPUT"
+          echo "npm=${npm}" >> "$GITHUB_OUTPUT"
+          echo "package/pyproject.toml: ${python}"
+          echo "ui/package.json: ${npm}"
+          if [ "${python}" = false ] && [ "${npm}" = false ]; then
+            echo "Neither package/pyproject.toml nor ui/package.json found" >&2
+            exit 1
+          fi
+
   publish-python:
+    needs: detect
+    if: needs.detect.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,6 +129,8 @@ jobs:
           twine upload package/dist/*
 
   publish-npm:
+    needs: detect
+    if: needs.detect.outputs.npm == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
