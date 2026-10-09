@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
-import { Settings, Download, Star } from "lucide-react";
+import { Download, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import ExtensionIcon from "@/components/console/extension-icon";
 import { Card, CardContent } from "@/components/ui/card";
 import DialogPost from "@/components/console/dialog-post";
 
@@ -101,7 +102,7 @@ export default function PropsOnboarding({ tree }: PropsOnboardingProps) {
       </div>
       <CardContent className="p-5">
         <div className="mb-4 flex items-start gap-4">
-          <Settings size={68} />
+          <ExtensionIcon handle="props" name="Props" size="lg" />
           <div className="min-w-0 flex-1">
             <h3 className="truncate font-semibold text-foreground">Props Extension</h3>
             <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
@@ -124,7 +125,7 @@ export default function PropsOnboarding({ tree }: PropsOnboardingProps) {
 
         <div className="flex items-center justify-between border-t border-border pt-4">
           <div className="flex items-center gap-4">
-            <div className="text-xs text-muted-foreground">by Renglo</div>
+            <div className="text-xs text-muted-foreground">by Productora</div>
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Download className="h-3.5 w-3.5" />
               Included
