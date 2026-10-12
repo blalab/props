@@ -3,11 +3,12 @@ name: Publish extension (Python + npm)
 # For Renglo-style extension repos. One tag publishes whichever trees exist:
 #   package/pyproject.toml  →  Python wheel
 #   ui/package.json         →  npm package
-# Missing trees skip that job. Canonical copy: ops/publisher/workflows/publish-extension.yml
+# Missing trees skip that job. Copy this file to .github/workflows/publish-extension.yml
+# in each product repo. Canonical copy: renglo-ops/samples/publish-extension.yml
 #
 # Repository variables (same three for every publish workflow in this repo):
 #   AWS_PUBLISH_ROLE_ARN
-#   PUBLISHER_NAME            e.g. renglo  →  SSM /publisher/renglo/config
+#   PUBLISHER_NAME            e.g. apollo  →  SSM /publisher/apollo/config
 #   AWS_REGION
 #
 # Optional: PUBLISH_PUBLIC=true plus PYPI_API_TOKEN and NPM_TOKEN secrets
@@ -91,31 +92,69 @@ jobs:
             --domain "$DOMAIN" \
             --domain-owner "$ACCOUNT" \
             --repository "$REPO"
-          # Copy repo-root blueprints/ into package/<import>/blueprints/ (git layout unchanged).
-          python3 <<'PY'
-          from pathlib import Path
-          import shutil
-          root = Path(".")
-          src = root / "blueprints"
-          files = sorted(src.glob("*.json")) if src.is_dir() else []
-          if not files:
-              print("No repo-root blueprints/*.json; skipping stage")
-              raise SystemExit(0)
-          skip = {"tests", "test", "docs", "build", "dist"}
-          dest_pkg = None
-          for child in sorted((root / "package").iterdir()):
-              if child.is_dir() and (child / "__init__.py").is_file() and child.name not in skip and not child.name.endswith(".egg-info"):
-                  dest_pkg = child
-                  break
-          if dest_pkg is None:
-              raise SystemExit("Could not find import package under package/")
-          dest = dest_pkg / "blueprints"
-          dest.mkdir(parents=True, exist_ok=True)
-          for path in files:
-              shutil.copy2(path, dest / path.name)
-          print(f"Staged {len(files)} blueprint(s) into {dest}")
-          PY
+          # Repo-root blueprints/ stays out of the package tree. After the
+          # build, those JSON files are added onto the wheel at
+          # <import>/blueprints/ so an install can find them.
           python -m build package
+          python3 <<'PY'
+          import base64
+          import csv
+          import hashlib
+          import io
+          import zipfile
+          from pathlib import Path
+
+          root = Path(".")
+          files = sorted((root / "blueprints").glob("*.json")) if (root / "blueprints").is_dir() else []
+          if not files:
+              print("No repo-root blueprints/*.json; skipping wheel stage")
+              raise SystemExit(0)
+          wheels = sorted((root / "package" / "dist").glob("*.whl"))
+          if not wheels:
+              raise SystemExit("No wheel built under package/dist")
+          wheel_path = wheels[-1]
+          skip = {"tests", "test", "docs", "build", "dist"}
+          import_name = None
+          for child in sorted((root / "package").iterdir()):
+              if (
+                  child.is_dir()
+                  and (child / "__init__.py").is_file()
+                  and child.name not in skip
+                  and not child.name.endswith(".egg-info")
+              ):
+                  import_name = child.name
+                  break
+          if import_name is None:
+              raise SystemExit("Could not find import package under package/")
+
+          def file_hash(data: bytes) -> str:
+              digest = hashlib.sha256(data).digest()
+              return "sha256=" + base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+
+          with zipfile.ZipFile(wheel_path) as zf:
+              names = zf.namelist()
+              record_name = next(name for name in names if name.endswith(".dist-info/RECORD"))
+              payload = {name: zf.read(name) for name in names if name != record_name}
+          staged = []
+          for path in files:
+              arc = f"{import_name}/blueprints/{path.name}"
+              payload[arc] = path.read_bytes()
+              staged.append(arc)
+          buffer = io.StringIO()
+          writer = csv.writer(buffer, lineterminator="\n")
+          for arc in sorted(payload):
+              data = payload[arc]
+              writer.writerow([arc, file_hash(data), str(len(data))])
+          writer.writerow([record_name, "", ""])
+          record = buffer.getvalue().encode()
+          tmp = wheel_path.with_suffix(".whl.tmp")
+          with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+              for arc in sorted(payload):
+                  zf.writestr(arc, payload[arc])
+              zf.writestr(record_name, record)
+          tmp.replace(wheel_path)
+          print(f"Staged {len(staged)} blueprint(s) onto {wheel_path.name}")
+          PY
           twine upload --repository codeartifact package/dist/*
 
       - name: Publish to public PyPI

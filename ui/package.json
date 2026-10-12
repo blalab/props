@@ -1,0 +1,24 @@
+{
+  "name": "@skbrk/props",
+  "version": "1.0.3",
+  "renglo": {
+    "platform": "0.1.6"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./props.tsx",
+  "exports": {
+    ".": "./props.tsx",
+    "./ui/*": "./*",
+    "./ui/navigation/*": "./navigation/*",
+    "./ui/onboarding/*": "./onboarding/*",
+    "./ui/pages/*": "./pages/*",
+    "./pages/*": "./pages/*",
+    "./components/*": "./components/*"
+  },
+  "peerDependencies": {
+    "lucide-react": "^0.426.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
