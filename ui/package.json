@@ -1,8 +1,8 @@
 {
   "name": "@skbrk/props",
-  "version": "1.0.3",
+  "version": "1.0.4-rc.1",
   "renglo": {
-    "platform": "0.1.6"
+    "platform": "0.1.7"
   },
   "license": "MIT",
   "type": "module",
