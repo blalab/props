@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "renglo-props"
-version = "1.0.4"
+version = "1.0.5rc1"
 description = "Props custom handlers, blueprints, and utilities"
 license = { text = "MIT" }
 authors = [
@@ -28,4 +28,4 @@ packages = ["props", "props.handlers"]
 props = ["blueprints/*.json"]
 
 [tool.renglo]
-platform = "0.1.7"
+platform = "0.1.12"
