@@ -8,7 +8,7 @@ name: Publish extension (Python + npm)
 #
 # Repository variables (same three for every publish workflow in this repo):
 #   AWS_PUBLISH_ROLE_ARN
-#   PUBLISHER_NAME            e.g. apollo  →  SSM /publisher/apollo/config
+#   PUBLISHER_NAME            e.g. renglo  →  SSM /publisher/renglo/config
 #   AWS_REGION
 #
 # Optional: PUBLISH_PUBLIC=true plus PYPI_API_TOKEN and NPM_TOKEN secrets
